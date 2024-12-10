@@ -58,21 +58,17 @@ def preprocess_data(tokens, transactions, token_transfers, nft_transfers, dex_sw
     allowed_columns = ['SYMBOL', 'CREATED_BLOCK_TIMESTAMP', 'CREATOR_ADDRESS', 
                        'TO_ADDRESS_x', 'tx_count', 'TO_ADDRESS_y', 'tx_value_sum', 
                        'CONTRACT_ADDRESS_x', 'transfer_count', 'CONTRACT_ADDRESS_y', 
-                       'transfer_value_sum', 'ADDRESS']  # Include the encoded address
+                       'transfer_value_sum', 'ADDRESS']
 
     if is_training:
         allowed_columns.append('LABEL')
 
-    if not is_training:
-        allowed_columns.append('ADDRESS')  # Keep 'ADDRESS' for the test set
-
     # Handle missing columns by filling with zeros
-    existing_columns = [col for col in allowed_columns if col in features.columns]
     for col in allowed_columns:
         if col not in features.columns:
             features[col] = 0
 
-    features = features[existing_columns]
+    features = features[allowed_columns]
     return features
 
 # Preprocess training data
@@ -83,13 +79,12 @@ y = features['LABEL']
 # Check if the dataset is imbalanced
 print("Target label distribution:\n", y.value_counts())
 
-# If labels are imbalanced, use class_weight='balanced' in the RandomForestClassifier
+# Train the model
 rf_model = RandomForestClassifier(random_state=42, n_estimators=100, class_weight='balanced')
 
 # Split into train and validation sets
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train the model
 rf_model.fit(X_train, y_train)
 
 # Validate the model
@@ -97,7 +92,7 @@ y_val_pred = rf_model.predict(X_val)
 accuracy = accuracy_score(y_val, y_val_pred)
 print(f"Validation Accuracy: {accuracy:.2f}")
 
-# Check confusion matrix to understand class predictions
+# Check confusion matrix
 conf_matrix = confusion_matrix(y_val, y_val_pred)
 print("Confusion Matrix:\n", conf_matrix)
 
@@ -109,16 +104,16 @@ X_test = X_test.reindex(columns=X_train.columns, fill_value=0)  # Ensure consist
 # Generate predictions for the test set
 test_predictions = rf_model.predict(X_test)
 
-# Ensure predictions are binary (0 or 1)
-test_predictions = np.clip(test_predictions, 0, 1)
+# Map predictions to binary labels (0 or 1)
+test_predictions_binary = (test_predictions == 1).astype(int)  # Replace this logic with your binary-class mapping logic
 
-# Create the final submission file
+# Create the submission file
 submission = pd.DataFrame({
-    'ADDRESS': test_features['ADDRESS'],  # Ensure 'ADDRESS' exists
-    'PRED': test_predictions  # PRED should be 1D
+    'ADDRESS': test_tokens['ADDRESS'],  # Use the original addresses from the test dataset
+    'PRED': test_predictions_binary
 })
 
-# Optionally, print the first few rows of the submission file
+# Verify the structure of the submission file
 print(submission.head())
 
 # Save to CSV
